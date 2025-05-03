@@ -50,16 +50,22 @@
     .btn:hover {
       background-color: orangered;
     }
+
+    #userEmail {
+      color: white;
+      font-weight: bold;
+      margin-top: 10px;
+    }
   </style>
 </head>
 
 <body>
 
-  <h1>Boy_yuskid's Orange Space Calendar</h1>
+  <h1>Boy_yuskid's Orange Dynasty Space Calendar</h1>
 
-  <div id="loginSection" style="text-align: center;">
-    <button class="btn" onclick="signIn()">🔐 Login with Google</button>
-    <p id="userEmail" style="margin-top: 10px; font-weight: bold;"></p>
+  <div style="text-align:center; margin-bottom: 20px;">
+    <button class="btn" onclick="login()">🔐 Login with Google</button>
+    <p id="userEmail">Not logged in</p>
   </div>
 
   <table id="calendarTable">
@@ -80,10 +86,11 @@
     <button class="btn" onclick="saveToFirebase()">💾 Save</button>
   </div>
 
+  <!-- Firebase SDK and Config -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZbG28EAyuIqt-ydjnFa_wFVX_hELAewQ",
@@ -99,8 +106,8 @@
     const db = getFirestore(app);
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
-    const allowedEmails = ["adebayosolomon54@gmail.com", "ojoyuskid@gmail.com"];
 
+    const allowedEmails = ["adebayosolomon54@gmail.com", "ojoyuskid@gmail.com"];
     let userCanEdit = false;
 
     const tableBody = document.getElementById("tableBody");
@@ -115,6 +122,17 @@
         row.appendChild(cell);
       });
       tableBody.appendChild(row);
+    }
+
+    async function loadFromFirebase() {
+      const docRef = doc(db, "calendar", "shared");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const rows = docSnap.data().entries;
+        rows.forEach(row => addRow(row));
+      } else {
+        for (let i = 0; i < 10; i++) addRow(); // default blank rows
+      }
     }
 
     async function saveToFirebase() {
@@ -141,31 +159,34 @@
       alert("✅ Saved to Firebase!");
     }
 
-    function signIn() {
-      signInWithPopup(auth, provider).catch(err => {
-        console.error("Login failed:", err);
+    async function login() {
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        userEmailDisplay.innerText = `👤 Logged in as: ${user.email}`;
+        userCanEdit = allowedEmails.includes(user.email);
+
+        if (userCanEdit) {
+          alert("✅ You have edit access.");
+          enableEditing();
+        } else {
+          alert("🔒 View-only access.");
+        }
+      } catch (error) {
+        console.error("Login error:", error);
+        alert("❌ Login failed.");
+      }
+    }
+
+    function enableEditing() {
+      [...tableBody.rows].forEach(row => {
+        [...row.cells].forEach(cell => {
+          cell.contentEditable = userCanEdit;
+        });
       });
     }
 
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        const email = user.email;
-        userEmailDisplay.textContent = `Logged in as: ${email}`;
-        userCanEdit = allowedEmails.includes(email);
-        tableBody.innerHTML = "";
-      }
-    });
-
-    const docRef = doc(db, "calendar", "shared");
-    onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        tableBody.innerHTML = "";
-        const rows = docSnap.data().entries;
-        rows.forEach(row => addRow(row));
-      } else {
-        for (let i = 0; i < 10; i++) addRow();
-      }
-    });
+    loadFromFirebase();
   </script>
 
 </body>
