@@ -1,97 +1,71 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-  <title>Boy_yuskid's Orange Dynasty Space Calendar</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orange Dynasty Calendar</title>
   <style>
     body {
-      background-color: orange;
       font-family: Arial, sans-serif;
-      margin: 20px;
-    }
-
-    h1 {
       text-align: center;
-      color: white;
+      margin: 0;
+      padding: 2rem;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      background-color: #fff3e0;
+      margin-top: 1rem;
     }
 
     th,
     td {
-      border: 2px solid darkorange;
+      border: 1px solid #ddd;
       padding: 10px;
       text-align: center;
     }
 
-    th {
-      background-color: darkorange;
-      color: white;
-    }
-
-    td[contenteditable="true"] {
-      background-color: #ffffff;
-    }
-
-    .btn {
-      margin: 10px 5px;
-      padding: 10px 20px;
-      background-color: darkorange;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    .btn:hover {
-      background-color: orangered;
+    button {
+      margin: 5px;
+      padding: 10px;
     }
 
     #userEmail {
-      color: white;
+      margin-top: 1rem;
       font-weight: bold;
-      margin-top: 10px;
     }
   </style>
 </head>
 
 <body>
-
-  <h1>Boy_yuskid's Orange Dynasty Space Calendar</h1>
-
-  <div style="text-align:center; margin-bottom: 20px;">
-    <button class="btn" onclick="login()">🔐 Login with Google</button>
-    <p id="userEmail">Not logged in</p>
-  </div>
-
-  <table id="calendarTable">
+  <h1>🧡 Orange Dynasty Space Calendar</h1>
+  <button onclick="signIn()">🔓 Login with Google</button>
+  <button onclick="signOut()">🔒 Logout</button>
+  <button onclick="addRow()">➕ Add Row</button>
+  <button onclick="saveToFirebase()">💾 Save Changes</button>
+  <div id="userEmail">Not logged in</div>
+  <table>
     <thead>
       <tr>
-        <th>Topic</th>
-        <th>Host</th>
-        <th>Time</th>
         <th>Day</th>
-        <th>Re-occurring</th>
+        <th>Date</th>
+        <th>Event</th>
+        <th>Time</th>
+        <th>Notes</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
   </table>
 
-  <div style="text-align:center;">
-    <button class="btn" onclick="addRow()">+ Add More</button>
-    <button class="btn" onclick="saveToFirebase()">💾 Save</button>
-  </div>
-
-  <!-- Firebase SDK and Config -->
+  <!-- Firebase Scripts -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    // Import Firebase modules
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    import { getAuth, signInWithPopup, signOut, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
+    // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAZbG28EAyuIqt-ydjnFa_wFVX_hELAewQ",
       authDomain: "orange-dynasty-calendar.firebaseapp.com",
@@ -102,9 +76,10 @@
       measurementId: "G-L8BC8M227S"
     };
 
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const auth = getAuth();
+    const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
     const allowedEmails = ["adebayosolomon54@gmail.com", "ojoyuskid@gmail.com"];
@@ -113,82 +88,80 @@
     const tableBody = document.getElementById("tableBody");
     const userEmailDisplay = document.getElementById("userEmail");
 
+    // Add empty row
     function addRow(data = ["", "", "", "", ""]) {
       const row = document.createElement("tr");
-      data.forEach(cellText => {
+      data.forEach(text => {
         const cell = document.createElement("td");
+        cell.textContent = text;
         if (userCanEdit) cell.contentEditable = true;
-        cell.innerText = cellText;
         row.appendChild(cell);
       });
       tableBody.appendChild(row);
     }
 
-    async function loadFromFirebase() {
-      const docRef = doc(db, "calendar", "shared");
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const rows = docSnap.data().entries;
-        rows.forEach(row => addRow(row));
-      } else {
-        for (let i = 0; i < 10; i++) addRow(); // default blank rows
-      }
-    }
-
+    // Save table content to Firestore
     async function saveToFirebase() {
-      if (!userCanEdit) {
-        alert("❌ You don't have permission to edit.");
-        return;
-      }
-
-      const rows = [];
-      const table = document.getElementById("calendarTable");
-      for (let i = 1; i < table.rows.length; i++) {
-        const row = table.rows[i];
+      if (!userCanEdit) return alert("❌ You don't have permission to edit.");
+      const data = [];
+      for (let row of tableBody.rows) {
         const rowData = [];
-        for (let j = 0; j < row.cells.length; j++) {
-          rowData.push(row.cells[j].innerText.trim());
-        }
-        rows.push(rowData);
+        for (let cell of row.cells) rowData.push(cell.innerText);
+        data.push(rowData);
       }
-
-      await setDoc(doc(db, "calendar", "shared"), {
-        entries: rows
-      });
-
-      alert("✅ Saved to Firebase!");
+      await setDoc(doc(db, "calendar", "entries"), { data });
+      alert("✅ Changes saved.");
     }
 
-    async function login() {
+    // Load table from Firestore
+    async function loadData() {
+      const docSnap = await getDoc(doc(db, "calendar", "entries"));
+      if (docSnap.exists()) {
+        const savedData = docSnap.data().data;
+        savedData.forEach(row => addRow(row));
+      } else {
+        addRow(); // start with an empty row
+      }
+    }
+
+    // Sign in
+    async function signIn() {
       try {
         const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        userEmailDisplay.innerText = `👤 Logged in as: ${user.email}`;
-        userCanEdit = allowedEmails.includes(user.email);
-
-        if (userCanEdit) {
-          alert("✅ You have edit access.");
-          enableEditing();
-        } else {
-          alert("🔒 View-only access.");
-        }
+        const email = result.user.email;
+        userEmailDisplay.textContent = "Logged in as: " + email;
+        userCanEdit = allowedEmails.includes(email);
+        tableBody.innerHTML = ""; // Clear old rows
+        loadData();
       } catch (error) {
-        console.error("Login error:", error);
-        alert("❌ Login failed.");
+        alert("Login failed: " + error.message);
       }
     }
 
-    function enableEditing() {
-      [...tableBody.rows].forEach(row => {
-        [...row.cells].forEach(cell => {
-          cell.contentEditable = userCanEdit;
-        });
+    // Sign out
+    function signOutUser() {
+      signOut(auth).then(() => {
+        userCanEdit = false;
+        userEmailDisplay.textContent = "Not logged in";
+        tableBody.innerHTML = "";
       });
     }
 
-    loadFromFirebase();
-  </script>
+    window.signIn = signIn;
+    window.signOut = signOutUser;
+    window.addRow = addRow;
+    window.saveToFirebase = saveToFirebase;
 
+    // On page load: check auth state
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        const email = user.email;
+        userCanEdit = allowedEmails.includes(email);
+        userEmailDisplay.textContent = "Logged in as: " + email;
+        loadData();
+      }
+    });
+  </script>
 </body>
 
 </html>
